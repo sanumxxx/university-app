@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Федерация спортивного программирования МО</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            light: '#a78bfa', // Lighter Purple
+                            DEFAULT: '#8b5cf6', // Tailwind Indigo-500 (Purple)
+                            dark: '#6b46c1'      // Darker Purple
+                        },
+                        'team-card-bg': '#f9f5ff', // Very Light Purple for Team Cards
+                        'team-card-border': '#e9d8fd', // Light Purple Border
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: #f3f4f6; /* Very Light Gray Background, almost white */
+            color: #111827; /* Dark Gray Text, almost black */
+        }
+        .team-card {
+           background-color: theme('colors.team-card-bg');
+            border: 1px solid theme('colors.team-card-border');
+        }
+        .team-card:hover {
+            transform: scale(1.05);
+            transition: transform 0.2s ease-in-out;
+        }
+        .nav-link:hover {
+            color: theme('colors.primary.light'); /* Light Purple Hover */
+        }
+    </style>
+</head>
+<body class=""> <!-- Removed bg-gray-50 from body class -->
+    <!-- Навигация -->
+    <header class="fixed w-full bg-black z-50 backdrop-blur-sm bg-opacity-90"> <!-- Black Header Background -->
+        <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <a href="#" class="text-white text-xl font-bold hover:scale-105 transition-transform">ФСПМО</a>
+            <div class="hidden md:flex space-x-8">
+                <a href="#about" class="text-white nav-link transition-colors">О Федерации</a>
+                <a href="#disciplines" class="text-white nav-link transition-colors">Дисциплины</a>
+                <a href="#events" class="text-white nav-link transition-colors">Мероприятия</a>
+                <a href="#news" class="text-white nav-link transition-colors">Новости</a>
+                <a href="#contact" class="text-white nav-link transition-colors">Контакты</a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Главный экран -->
+    <section class="h-screen relative flex items-center justify-center text-white overflow-hidden">
+        <div id="particles-js" class="absolute inset-0 bg-gradient-to-br from-primary-dark via-primary to-black"> <!-- Gradient to Black -->
+            <!-- Particles will be white against this background -->
+        </div>
+        <div class="container mx-auto px-4 text-center" data-aos="fade-up">
+            <h1 class="text-4xl md:text-5xl font-bold mb-6">Федерация спортивного программирования<br>Московской области</h1>
+            <p class="text-xl mb-8 opacity-90">Развиваем таланты, создаем будущее IT</p>
+            <a href="#events" class="bg-primary-DEFAULT text-white px-8 py-3 rounded-lg font-bold hover:bg-primary-light transition-colors inline-block">Участвовать в соревнованиях</a> <!-- Purple Button -->
+        </div>
+    </section>
+
+    <!-- О Федерации -->
+    <section id="about" class="py-20">
+        <div class="container mx-auto px-4">
+            <h2 class="text-3xl text-center text-black font-bold mb-16" data-aos="fade-up">О Федерации</h2> <!-- Black Section Title -->
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div class="space-y-6" data-aos="fade-right">
+                    <p class="text-lg">Федерация спортивного программирования Московской области - это организация, объединяющая профессионалов и энтузиастов в области спортивного программирования.</p>
+                    <h3 class="text-xl text-black font-bold">Структура федерации</h3> <!-- Black Subtitle -->
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="team-card p-4 rounded-lg shadow-md hover:scale-105 transition-transform" data-aos="zoom-in" data-aos-delay="100">
+                            <h4 class="text-lg font-semibold text-black">Председатель федерации</h4> <!-- Black Card Title -->
+                            <p class="text-sm text-gray-700 mt-1">Главное должностное лицо, определяющее стратегическое направление.</p>
+                         </div>
+                         <div class="team-card p-4 rounded-lg shadow-md hover:scale-105 transition-transform" data-aos="zoom-in" data-aos-delay="200">
+                            <h4 class="text-lg font-semibold text-black">Тренер</h4>
+                            <p class="text-sm text-gray-700 mt-1">Отвечает за подготовку отдельных спортсменов и команд к соревнованиям.</p>
+                         </div>
+                         <div class="team-card p-4 rounded-lg shadow-md hover:scale-105 transition-transform" data-aos="zoom-in" data-aos-delay="300">
+                            <h4 class="text-lg font-semibold text-black">Тренер</h4>
+                            <p class="text-sm text-gray-700 mt-1">Специализируется на  развитии  определенных навыков у  программистов.</p>
+                         </div>
+                          <div class="team-card p-4 rounded-lg shadow-md hover:scale-105 transition-transform" data-aos="zoom-in" data-aos-delay="400">
+                            <h4 class="text-lg font-semibold text-black">Тренер</h4>
+                            <p class="text-sm text-gray-700 mt-1">Осуществляет  методическую поддержку и  консультирование  спортсменов.</p>
+                         </div>
+                    </div>
+                </div>
+                <div data-aos="fade-left">
+                    <img src="/api/placeholder/600/400" alt="О федерации" class="rounded-lg shadow-lg w-full">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Дисциплины -->
+    <section id="disciplines" class="py-20 bg-white"> <!-- White Background Section -->
+        <div class="container mx-auto px-4">
+            <h2 class="text-3xl text-center text-black font-bold mb-16" data-aos="fade-up">Дисциплины</h2> <!-- Black Section Title -->
+            <div class="grid md:grid-cols-3 sm:grid-cols-2 grid-cols-1 gap-8">
+                <div class="bg-team-card-bg p-8 rounded-lg shadow-md transition-transform hover:-translate-y-2"> <!-- Light Purple Card Background -->
+                    <div class="text-4xl text-primary-DEFAULT mb-4"><i class="fas fa-laptop-code"></i></div> <!-- Purple Icon -->
+                    <h3 class="text-xl font-bold text-black mb-4">Алгоритмическое программирование</h3> <!-- Black Card Title -->
+                    <p>Решение алгоритмических задач на время с использованием различных языков программирования.</p>
+                </div>
+                <div class="bg-team-card-bg p-8 rounded-lg shadow-md transition-transform hover:-translate-y-2" data-aos="fade-up" data-aos-delay="100">
+                    <div class="text-4xl text-primary-DEFAULT mb-4"><i class="fas fa-users"></i></div>
+                    <h3 class="text-xl font-bold text-black mb-4">Командное программирование</h3>
+                    <p>Командные соревнования по решению сложных алгоритмических задач.</p>
+                </div>
+                <div class="bg-team-card-bg p-8 rounded-lg shadow-md transition-transform hover:-translate-y-2" data-aos="fade-up" data-aos-delay="200">
+                    <div class="text-4xl text-primary-DEFAULT mb-4"><i class="fas fa-bug"></i></div>
+                    <h3 class="text-xl font-bold text-black mb-4">Спортивное хакерство</h3>
+                    <p>Соревнования по поиску и исправлению уязвимостей в программном коде.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Мероприятия -->
+    <section id="events" class="py-20">
+        <div class="container mx-auto px-4">
+            <h2 class="text-3xl text-center text-black font-bold mb-16" data-aos="fade-up">Мероприятия</h2> <!-- Black Section Title -->
+            <div class="grid md:grid-cols-3 sm:grid-cols-2 grid-cols-1 gap-8">
+                <div class="bg-white rounded-lg shadow-md overflow-hidden transition-transform hover:-translate-y-2" data-aos="fade-up">
+                    <img src="/api/placeholder/400/200" alt="Мероприятие 1" class="w-full h-48 object-cover">
+                    <div class="p-6">
+                        <h3 class="text-xl font-bold text-black mb-4">Открытый кубок МО</h3> <!-- Black Card Title -->
+                        <p>Ежегодное соревнование для программистов всех уровней.</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md overflow-hidden transition-transform hover:-translate-y-2" data-aos="fade-up" data-aos-delay="100">
+                    <img src="/api/placeholder/400/200" alt="Мероприятие 2" class="w-full h-48 object-cover">
+                    <div class="p-6">
+                        <h3 class="text-xl font-bold text-black mb-4">Школьная лига</h3>
+                        <p>Серия соревнований для учащихся школ Московской области.</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md overflow-hidden transition-transform hover:-translate-y-2" data-aos="fade-up" data-aos-delay="200">
+                    <img src="/api/placeholder/400/200" alt="Мероприятие 3" class="w-full h-48 object-cover">
+                    <div class="p-6">
+                        <h3 class="text-xl font-bold text-black mb-4">Студенческий чемпионат</h3>
+                        <p>Соревнования между университетами Московской области.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Новости -->
+    <section id="news" class="py-20 bg-white"> <!-- White Background Section -->
+        <div class="container mx-auto px-4">
+            <h2 class="text-3xl text-center text-black font-bold mb-16" data-aos="fade-up">Новости</h2> <!-- Black Section Title -->
+            <div class="grid md:grid-cols-3 sm:grid-cols-2 grid-cols-1 gap-8">
+                <div class="bg-white rounded-lg shadow-md overflow-hidden" data-aos="fade-up">
+                    <img src="/api/placeholder/400/200" alt="Новость 1" class="w-full h-48 object-cover">
+                    <div class="p-6">
+                        <div class="text-gray-600 text-sm mb-2">15 февраля 2025</div>
+                        <h3 class="text-xl font-bold text-black mb-4">Итоги зимнего сезона</h3> <!-- Black Card Title -->
+                        <p>Подведены итоги зимнего сезона соревнований по спортивному программированию.</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md overflow-hidden" data-aos="fade-up" data-aos-delay="100">
+                    <img src="/api/placeholder/400/200" alt="Новость 2" class="w-full h-48 object-cover">
+                    <div class="p-6">
+                        <div class="text-gray-600 text-sm mb-2">10 февраля 2025</div>
+                        <h3 class="text-xl font-bold text-black mb-4">Регистрация на весенний сезон</h3>
+                        <p>Начат прием заявок на участие в весеннем сезоне соревнований 2025 года.</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md overflow-hidden" data-aos="fade-up" data-aos-delay="200">
+                    <img src="/api/placeholder/400/200" alt="Новость 3" class="w-full h-48 object-cover">
+                    <div class="p-6">
+                        <div class="text-gray-600 text-sm mb-2">5 февраля 2025</div>
+                        <h3 class="text-xl font-bold text-black mb-4">Мастер-класс по алгоритмам</h3>
+                        <p>Приглашаем на серию мастер-классов по алгоритмам и структурам данных.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Контакты -->
+    <section id="contact" class="py-20">
+        <div class="container mx-auto px-4">
+            <h2 class="text-3xl text-center text-black font-bold mb-16" data-aos="fade-up">Контакты</h2> <!-- Black Section Title -->
+            <div class="grid md:grid-cols-2 grid-cols-1 gap-12">
+                <div class="space-y-8" data-aos="fade-right">
+                    <div class="flex items-center space-x-4">
+                        <div class="text-2xl text-black"><i class="fas fa-map-marker-alt"></i></div> <!-- Black Icon -->
+                        <p class="text-black">г. Москва, ул. Примерная, д. 123</p> <!-- Black Text -->
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="text-2xl text-black"><i class="fas fa-phone"></i></div>
+                        <p class="text-black">+7 (495) 123-45-67</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="text-2xl text-black"><i class="fas fa-envelope"></i></div>
+                        <p class="text-black">info@fspmo.ru</p>
+                    </div>
+                </div>
+                <form class="space-y-6" data-aos="fade-left">
+                    <input type="text" placeholder="Ваше имя" class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-DEFAULT text-black" required> <!-- Black Text Input, Purple Focus -->
+                    <input type="email" placeholder="Ваш email" class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-DEFAULT text-black" required>
+                    <textarea placeholder="Ваше сообщение" class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-DEFAULT h-32 text-black" required></textarea>
+                    <button type="submit" class="bg-black text-white px-8 py-3 rounded-lg font-bold hover:bg-gray-800 transition-colors">Отправить сообщение</button> <!-- Black Button, Darker Hover -->
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Футер -->
+    <footer class="bg-black text-white py-12"> <!-- Black Footer Background -->
+        <div class="container mx-auto px-4">
+            <div class="grid md:grid-cols-3 grid-cols-1 gap-12">
+                <div class="space-y-4">
+                    <h3 class="text-xl font-bold text-primary-light">О федерации</h3> <!-- Light Purple Footer Title -->
+                    <p class="text-gray-300">Федерация спортивного программирования Московской области развивает и поддерживает талантливых программистов региона.</p>
+                </div>
+                <div class="space-y-4">
+                    <h3 class="text-xl font-bold text-primary-light">Быстрые ссылки</h3> <!-- Light Purple Footer Title -->
+                    <ul class="space-y-2">
+                        <li><a href="#about" class="text-gray-300 hover:text-white transition-colors">О Федерации</a></li>
+                        <li><a href="#disciplines" class="text-gray-300 hover:text-white transition-colors">Дисциплины</a></li>
+                        <li><a href="#events" class="text-gray-300 hover:text-white transition-colors">Мероприятия</a></li>
+                        <li><a href="#news" class="text-gray-300 hover:text-white transition-colors">Новости</a></li>
+                        <li><a href="#contact" class="text-gray-300 hover:text-white transition-colors">Контакты</a></li>
+                    </ul>
+                </div>
+                <div class="space-y-4">
+                    <h3 class="text-xl font-bold text-primary-light">Социальные сети</h3> <!-- Light Purple Footer Title -->
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-300 hover:text-white transition-colors text-2xl">
+                            <span class="sr-only">Telegram</span>
+                            <i class="fab fa-telegram-plane"></i>
+                        </a>
+                        <a href="#" class="text-gray-300 hover:text-white transition-colors text-2xl">
+                            <span class="sr-only">VK</span>
+                            <i class="fab fa-vk"></i>
+                        </a>
+                        <a href="#" class="text-gray-300 hover:text-white transition-colors text-2xl">
+                            <span class="sr-only">GitHub</span>
+                             <i class="fab fa-github"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-12 pt-8 border-t border-gray-800 text-center text-gray-400">
+                <p>© 2025 Федерация спортивного программирования Московской области</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Инициализация AOS
+        AOS.init({
+            duration: 800,
+            offset: 100,
+            once: true
+        });
+
+        // Конфигурация particles.js
+        particlesJS('particles-js', {
+            particles: {
+                number: {
+                    value: 80,
+                    density: {
+                        enable: true,
+                        value_area: 800
+                    }
+                },
+                color: {
+                    value: '#ffffff' /* White Particles */
+                },
+                shape: {
+                    type: 'circle'
+                },
+                opacity: {
+                    value: 0.5,
+                    random: true,
+                    animation: {
+                        enable: true,
+                        speed: 1,
+                        opacity_min: 0.1,
+                        sync: false
+                    }
+                },
+                size: {
+                    value: 3,
+                    random: true,
+                    animation: {
+                        enable: true,
+                        speed: 2,
+                        size_min: 0.1,
+                        sync: false
+                    }
+                },
+                line_linked: {
+                    enable: true,
+                    distance: 150,
+                    color: '#ffffff', /* White Lines */
+                    opacity: 0.4,
+                    width: 1
+                },
+                move: {
+                    enable: true,
+                    speed: 2,
+                    direction: 'none',
+                    random: true,
+                    straight: false,
+                    out_mode: 'out',
+                    bounce: false,
+                }
+            },
+            interactivity: {
+                detect_on: 'canvas',
+                events: {
+                    onhover: {
+                        enable: true,
+                        mode: 'grab'
+                    },
+                    onclick: {
+                        enable: true,
+                        mode: 'push'
+                    },
+                    resize: true
+                },
+                modes: {
+                    grab: {
+                        distance: 140,
+                        line_linked: {
+                            opacity: 1
+                        }
+                    },
+                    push: {
+                        particles_nb: 4
+                    }
+                }
+            },
+            retina_detect: true
+        });
+
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // Мобильное меню
+        const mobileMenuButton = document.getElementById('mobile-menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+
+        mobileMenuButton.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+    </script>
+</body>
+</html>
