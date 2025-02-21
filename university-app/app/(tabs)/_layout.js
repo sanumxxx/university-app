@@ -1,11 +1,14 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../context/auth';
 
 export default function TabsLayout() {
+  const { user } = useAuth();
+
   return (
     <Tabs
       screenOptions={{
-        headerShown: false, // Скрываем заголовки для всех табов
+        headerShown: false,
         tabBarStyle: {
           backgroundColor: '#fff',
           borderTopWidth: 0.5,
@@ -44,7 +47,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="grades"
         options={{
-          title: 'Журнал',
+          title: user?.userType === 'teacher' ? 'Журнал' : 'Успеваемость',
           tabBarIcon: ({ focused, color }) => (
             <Ionicons
               name={focused ? 'document-text' : 'document-text-outline'}

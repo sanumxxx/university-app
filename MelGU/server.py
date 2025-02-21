@@ -354,13 +354,23 @@ def register_push_token():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-def send_push_notification(token, title, body):
+def send_push_notification(token, title, body, data=None):
     """Sends a push notification."""
     try:
         print(f"Sending push to token: {token}")
-        response = push_client.publish(
-            PushMessage(to=token, title=title, body=body, data={'type': 'message'}, sound="default", priority='high')
+        message = PushMessage(
+            to=token,
+            title=title,
+            body=body,
+            sound="default",
+            priority='high'
         )
+
+        # Добавляем data только если оно предоставлено
+        if data:
+            message._data = data
+
+        response = push_client.publish(message)
         print(f"Push response: {response}")
         return response
     except PushServerError as exc:
@@ -771,7 +781,7 @@ def get_announcement(announcement_id):
         })
     except Exception as e:
         print(f"Error fetching announcement: {str(e)}")  # Log the error
-        return jsonify({'success': False, 'error': str(e)}), 500  # Return a 500 error
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 
@@ -1072,6 +1082,48 @@ def get_students():
     } for s in students])
 
 
+@app.route('/api/student/profile', methods=['GET'])
+def get_student_profile():
+    """Gets student information by user_id."""
+    try:
+        user_id = request.args.get('user_id', type=int)
+
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'error': 'User ID is required'
+            }), 400
+
+        student = Student.query.filter_by(user_id=user_id).first()
+
+        if not student:
+            return jsonify({
+                'success': False,
+                'error': f'Student not found for user_id: {user_id}'
+            }), 404
+
+        student_data = {
+            'id': student.id,
+            'user_id': student.user_id,
+            'full_name': student.full_name,
+            'group_name': student.group_name,
+            'course': student.course
+        }
+
+        return jsonify({
+            'success': True,
+            'student': student_data
+        })
+
+    except Exception as e:
+        error_message = str(e)
+        print(f"Error in get_student_profile: {error_message}")
+        return jsonify({
+            'success': False,
+            'error': error_message
+        }), 500
+
+
 @app.route('/api/teachers', methods=['GET'])
 def get_teachers():
     """
@@ -1213,6 +1265,185 @@ def get_notifications():
         print(f"Error getting notifications: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 400
 
+# --- Grades ---
+@app.route('/api/grades', methods=['GET'])
+def get_grades():
+    """
+    Получает список оценок с возможностью фильтрации по группе, предмету и семестру.
+
+    Query Parameters:
+        - group (str, required): Название группы.
+        - subject (str, required): Название предмета.
+        - semester (str, required): Семестр.
+
+    Returns:
+        JSON response:
+            - success (bool): True if successful, False otherwise.
+            - grades (list, optional): List of grade objects.
+            - error (str, optional): Error message if retrieval fails.
+    """
+    try:
+        group_name = request.args.get('group')
+        subject = request.args.get('subject')
+        semester = request.args.get('semester')
+
+        if not all([group_name, subject, semester]):
+            return jsonify({'success': False, 'error': 'Missing required parameters'}), 400
+
+        students = Student.query.filter_by(group_name=group_name).all()
+        student_ids = [student.id for student in students]
+
+        grades = Grade.query.filter(
+            Grade.student_id.in_(student_ids),
+            Grade.subject == subject,
+            Grade.semester == semester
+        ).all()
+
+        return jsonify({
+            'success': True,
+            'grades': [{
+                'id': g.id,
+                'student_id': g.student_id,
+                'date': g.date.isoformat(),
+                'value': g.value,
+                'subject': g.subject,
+                'semester': g.semester
+            } for g in grades]
+        })
+    except Exception as e:
+        print(f"Error getting grades: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/grades', methods=['POST'])
+def create_grade():
+    """Creates or updates a grade."""
+    try:
+        data = request.json
+        student_id = data['student_id']
+        date = data['date']
+        value = data['value']
+        subject = data['subject']
+        semester = data['semester']
+
+        if not all([student_id, date, value, subject, semester]):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+
+        # Проверяем существование оценки
+        existing_grade = Grade.query.filter_by(
+            student_id=student_id,
+            date=date,
+            subject=subject,
+            semester=semester
+        ).first()
+
+        if existing_grade:
+            existing_grade.value = value
+            grade_id = existing_grade.id
+        else:
+            grade = Grade(
+                student_id=student_id,
+                date=date,
+                value=value,
+                subject=subject,
+                semester=semester
+            )
+            db.session.add(grade)
+            db.session.flush()
+            grade_id = grade.id
+
+        # Получаем информацию о студенте
+        student = Student.query.get(student_id)
+        if not student:
+            return jsonify({'success': False, 'error': 'Student not found'}), 404
+
+        teacher = Teacher.query.filter_by(user_id=g.user.id).first() if hasattr(g, 'user') else None
+        teacher_name = teacher.full_name if teacher else "Преподаватель"
+
+        notification_data = {
+            'route': 'grades',
+            'semester': semester,
+            'subject': subject,
+            'grade_id': grade_id
+        }
+
+        # Создаем уведомление с указанием маршрута для студента
+        notification = Notification(
+            user_id=student.user_id,
+            title="Новая оценка",
+            body=f"Преподаватель {teacher_name} {'изменил' if existing_grade else 'поставил'} вам оценку '{value}' по предмету '{subject}'",
+            type='grade',
+            reference_id=grade_id,
+            payload=notification_data
+        )
+        db.session.add(notification)
+
+        # Отправляем push-уведомление с дополнительными данными
+        tokens = PushToken.query.filter_by(user_id=student.user_id).all()
+        for token in tokens:
+            send_push_notification(
+                token=token.token,
+                title="Новая оценка",
+                body=f"Преподаватель {teacher_name} {'изменил' if existing_grade else 'поставил'} вам оценку '{value}' по предмету '{subject}'",
+                data=notification_data
+            )
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'grade_id': grade_id,
+            'student_user_id': student.user_id
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        error_message = str(e)
+        print(f"Error creating/updating grade: {error_message}")
+        return jsonify({'success': False, 'error': error_message}), 500
+
+@app.route('/api/grades/student', methods=['GET'])
+def get_student_grades():
+    """Gets grades for a specific student."""
+    try:
+        student_id = request.args.get('student_id', type=int)
+        semester = request.args.get('semester')
+
+        if not student_id:
+            return jsonify({'success': False, 'error': 'Student ID is required'}), 400
+
+        # Get the student
+        student = Student.query.get(student_id)
+        if not student:
+            return jsonify({'success': False, 'error': 'Student not found'}), 404
+
+        # Build the base query
+        query = Grade.query.filter(Grade.student_id == student_id)
+
+        # Add semester filter if provided
+        if semester:
+            query = query.filter(Grade.semester == semester)
+
+        # Execute query and get all grades
+        grades = query.order_by(Grade.date.desc()).all()
+
+        # Format the response
+        grades_data = [{
+            'id': grade.id,
+            'value': grade.value,
+            'date': grade.date.isoformat(),
+            'subject': grade.subject,
+            'semester': grade.semester
+        } for grade in grades]
+
+        return jsonify({
+            'success': True,
+            'grades': grades_data
+        })
+
+    except Exception as e:
+        print(f"Error getting student grades: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # ----------------------------------------------------------------------
 # API Endpoints - Тестирование и отладка

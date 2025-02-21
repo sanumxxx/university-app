@@ -1,161 +1,153 @@
 import { useState, useEffect } from 'react';
 import {
- View,
- StyleSheet,
- TouchableOpacity,
- Text,
- FlatList,
- ActivityIndicator,
-    RefreshControl,
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  FlatList,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
+import { useAuth } from '../../context/auth';
 import api from '../../utils/api';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
 
 dayjs.locale('ru');
 
 const formatTime = (time) => {
   if (!time) return '';
-  // Защита от неправильного формата
-  if (typeof time !== 'string') return '';
-
-  // Преобразуем "08" в "08:00"
-  if (time.length === 2) {
-    return `${time}:00`;
-  }
-
-  // Если уже в формате HH:MM, просто возвращаем
   if (time.includes(':')) {
     return time;
   }
-
-  return time;
+  return `${time}:00`;
 };
 
 export default function Schedule() {
- const [currentDate, setCurrentDate] = useState(dayjs());
- const [schedule, setSchedule] = useState([]);
- const [isLoading, setIsLoading] = useState(true);
- const [userData, setUserData] = useState(null);
- const [refreshing, setRefreshing] = useState(false);
+  const { user } = useAuth();
+  const [currentDate, setCurrentDate] = useState(dayjs());
+  const [schedule, setSchedule] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
- const onRefresh = async () => {
-    setRefreshing(true);
+  useEffect(() => {
+    loadSchedule();
+  }, [currentDate]);
+
+  const loadSchedule = async () => {
     try {
-      await loadSchedule();
+      const response = await api.get('/schedule', {
+        params: {
+          date: currentDate.format('YYYY-MM-DD')
+        }
+      });
+
+      if (!response.data || !Array.isArray(response.data)) {
+        setSchedule([]);
+        return;
+      }
+
+      // Сортируем пары по времени
+      const sortedLessons = response.data.sort((a, b) => {
+        return a.time_start.localeCompare(b.time_start);
+      });
+
+      // Группируем пары по времени
+      const timeSlots = {};
+      sortedLessons.forEach(lesson => {
+        const timeKey = `${lesson.time_start}-${lesson.time_end}`;
+
+        // Проверяем подходит ли пара для текущего пользователя
+        const isValidForUser = user.userType === 'teacher' ?
+          (lesson.teacher_name === user.teacher_name || lesson.teacher_name === user.fullName) :
+          (lesson.group_name === user.group_name && (!lesson.subgroup || lesson.subgroup === 0 || lesson.subgroup === user.subgroup));
+
+        if (isValidForUser) {
+          if (!timeSlots[timeKey]) {
+            timeSlots[timeKey] = {
+              id: timeKey,
+              timeStart: lesson.time_start,
+              timeEnd: lesson.time_end,
+              lessons: []
+            };
+          }
+          timeSlots[timeKey].lessons.push(lesson);
+        }
+      });
+
+      // Преобразуем в массив и сортируем по времени
+      const formattedSchedule = Object.values(timeSlots)
+        .sort((a, b) => a.timeStart.localeCompare(b.timeStart));
+
+      // Если для преподавателя есть несколько групп в одно время,
+      // группируем их в одну пару
+      if (user.userType === 'teacher') {
+        formattedSchedule.forEach(slot => {
+          const groupedLessons = {};
+          slot.lessons.forEach(lesson => {
+            const key = `${lesson.subject}-${lesson.lesson_type}-${lesson.auditory}`;
+            if (!groupedLessons[key]) {
+              groupedLessons[key] = {
+                ...lesson,
+                groups: [lesson.group_name]
+              };
+            } else {
+              groupedLessons[key].groups.push(lesson.group_name);
+            }
+          });
+          slot.lessons = Object.values(groupedLessons);
+        });
+      }
+
+      setSchedule(formattedSchedule);
+    } catch (error) {
+      console.error('Failed to load schedule:', error);
     } finally {
+      setIsLoading(false);
       setRefreshing(false);
     }
   };
 
- useEffect(() => {
-   loadUserData();
- }, []);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadSchedule();
+  };
 
- useEffect(() => {
-   loadSchedule();
- }, [currentDate]);
+  const renderLesson = ({ item }) => (
+    <View style={styles.lessonCard}>
+      <View style={styles.timeContainer}>
+        <Text style={styles.timeText}>
+          {formatTime(item.timeStart)} - {formatTime(item.timeEnd)}
+        </Text>
+      </View>
+      <View style={styles.lessonsContainer}>
+        {item.lessons.map((lesson, index) => (
+          <View key={`${lesson.id}-${index}`}>
+            {index > 0 && <View style={styles.divider} />}
+            <View style={styles.lessonInfo}>
+              <Text style={styles.subjectText}>{lesson.subject}</Text>
+              <Text style={styles.detailsText}>
+                {lesson.lesson_type} • {lesson.auditory}
+                {lesson.subgroup > 0 && ` • ${lesson.subgroup} подгруппа`}
+              </Text>
+              <Text style={styles.teacherText}>
+                {user.userType === 'student'
+                  ? lesson.teacher_name
+                  : (lesson.groups ? lesson.groups.join(', ') : lesson.group_name)}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
 
- const loadUserData = async () => {
-   try {
-     const userStr = await AsyncStorage.getItem('user');
-     if (userStr) {
-       setUserData(JSON.parse(userStr));
-     }
-   } catch (error) {
-     console.error('Failed to load user data:', error);
-   }
- };
+  const goToPrevDay = () => setCurrentDate(prev => prev.subtract(1, 'day'));
+  const goToNextDay = () => setCurrentDate(prev => prev.add(1, 'day'));
 
- const loadSchedule = async () => {
-   try {
-     setIsLoading(true);
-
-     const token = await AsyncStorage.getItem('token');
-     if (!token) {
-       router.replace('/');
-       return;
-     }
-
-     const response = await api.get('/schedule', {
-       params: {
-         date: currentDate.format('YYYY-MM-DD')
-       }
-     });
-
-     const groupedLessons = {};
-     response.data.forEach(lesson => {
-       const timeKey = `${lesson.time_start}-${lesson.time_end}`;
-       if (!groupedLessons[timeKey]) {
-         groupedLessons[timeKey] = [];
-       }
-
-       if (userData?.userType === 'student') {
-         if (lesson.subgroup === 0 || lesson.subgroup === userData.subgroup) {
-           groupedLessons[timeKey].push(lesson);
-         }
-       } else {
-         groupedLessons[timeKey].push(lesson);
-       }
-     });
-
-     const formattedSchedule = Object.entries(groupedLessons)
-       .sort(([timeA], [timeB]) => timeA.localeCompare(timeB))
-       .map(([time, lessons]) => ({
-         id: time,
-         timeStart: time.split('-')[0],
-         timeEnd: time.split('-')[1],
-         lessons
-       }));
-
-     setSchedule(formattedSchedule);
-
-   } catch (error) {
-     console.error('Failed to load schedule:', error);
-     if (error.response?.status === 401) {
-       router.replace('/');
-     }
-   } finally {
-     setIsLoading(false);
-   }
- };
-
- const renderLesson = ({ item }) => (
-   <View style={styles.lessonCard}>
-     <View style={styles.timeContainer}>
-       <Text style={styles.timeText}>
-         {formatTime(item.timeStart)} - {formatTime(item.timeEnd)}
-       </Text>
-     </View>
-     <View style={styles.lessonsContainer}>
-       {item.lessons.map((lesson, index) => (
-         <View key={`${lesson.id}-${index}`}>
-           {index > 0 && <View style={styles.divider} />}
-           <View style={styles.lessonInfo}>
-             <Text style={styles.subjectText}>{lesson.subject}</Text>
-             <Text style={styles.detailsText}>
-               {lesson.lesson_type} • {lesson.auditory}
-               {lesson.subgroup > 0 && ` • ${lesson.subgroup} подгруппа`}
-             </Text>
-             <Text style={styles.teacherText}>
-               {userData?.userType === 'student' ? lesson.teacher_name : lesson.group_name}
-             </Text>
-           </View>
-         </View>
-       ))}
-     </View>
-   </View>
- );
-
- const goToPrevDay = () => setCurrentDate(prev => prev.subtract(1, 'day'));
- const goToNextDay = () => setCurrentDate(prev => prev.add(1, 'day'));
-
- return (
+  return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={goToPrevDay}>
@@ -170,7 +162,9 @@ export default function Schedule() {
       </View>
 
       {isLoading ? (
-        <ActivityIndicator style={styles.loader} color="#007AFF" />
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+        </View>
       ) : (
         <FlatList
           data={schedule}
@@ -183,8 +177,8 @@ export default function Schedule() {
               refreshing={refreshing}
               onRefresh={onRefresh}
               tintColor="#007AFF"
-              colors={["#007AFF"]} // для Android
-              title="Обновление..." // для iOS
+              colors={["#007AFF"]}
+              title="Обновление..."
             />
           }
           ListEmptyComponent={
@@ -196,7 +190,6 @@ export default function Schedule() {
       )}
     </SafeAreaView>
   );
-
 }
 
 const styles = StyleSheet.create({
@@ -204,7 +197,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F2F2F7',
   },
- header: {
+  header: {
     paddingVertical: 16,
     paddingHorizontal: 20,
     backgroundColor: '#fff',
@@ -214,76 +207,78 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
   },
- dateText: {
-   fontSize: 17,
-   fontWeight: '600',
-   color: '#000',
-   textTransform: 'capitalize',
- },
- listContent: {
-   padding: 16,
- },
- lessonCard: {
-   backgroundColor: '#fff',
-   borderRadius: 12,
-   marginBottom: 12,
-   padding: 16,
-   flexDirection: 'row',
-   shadowColor: '#000',
-   shadowOffset: {
-     width: 0,
-     height: 2,
-   },
-   shadowOpacity: 0.05,
-   shadowRadius: 3.84,
-   elevation: 5,
- },
- timeContainer: {
-   width: 110,
-   marginRight: 16,
-   flexShrink: 0,
- },
- timeText: {
-   fontSize: 15,
-   color: '#8E8E93',
-   fontVariant: ['tabular-nums'],
- },
- lessonsContainer: {
-   flex: 1,
- },
- lessonInfo: {
-   flex: 1,
- },
- divider: {
-   height: 1,
-   backgroundColor: '#E5E5EA',
-   marginVertical: 8,
- },
- subjectText: {
-   fontSize: 17,
-   fontWeight: '600',
-   color: '#000',
-   marginBottom: 4,
- },
- detailsText: {
-   fontSize: 15,
-   color: '#8E8E93',
-   marginBottom: 4,
- },
- teacherText: {
-   fontSize: 15,
-   color: '#007AFF',
- },
- loader: {
-   flex: 1,
- },
- emptyContainer: {
-   flex: 1,
-   alignItems: 'center',
-   paddingTop: 32,
- },
- emptyText: {
-   fontSize: 15,
-   color: '#8E8E93',
- },
+  dateText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
+    textTransform: 'capitalize',
+  },
+  listContent: {
+    padding: 16,
+  },
+  lessonCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 12,
+    padding: 16,
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  timeContainer: {
+    width: 110,
+    marginRight: 16,
+    flexShrink: 0,
+  },
+  timeText: {
+    fontSize: 15,
+    color: '#8E8E93',
+    fontVariant: ['tabular-nums'],
+  },
+  lessonsContainer: {
+    flex: 1,
+  },
+  lessonInfo: {
+    flex: 1,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E5EA',
+    marginVertical: 8,
+  },
+  subjectText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 4,
+  },
+  detailsText: {
+    fontSize: 15,
+    color: '#8E8E93',
+    marginBottom: 4,
+  },
+  teacherText: {
+    fontSize: 15,
+    color: '#007AFF',
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    paddingTop: 32,
+  },
+  emptyText: {
+    fontSize: 15,
+    color: '#8E8E93',
+  },
 });
