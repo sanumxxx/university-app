@@ -7,6 +7,7 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,27 +15,95 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import { useAuth } from '../../context/auth';
 import api from '../../utils/api';
+import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  runOnJS
+} from 'react-native-reanimated';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
 
 dayjs.locale('ru');
 
 const formatTime = (time) => {
   if (!time) return '';
-  if (time.includes(':')) {
-    return time;
-  }
-  return `${time}:00`;
+  const [hours, minutes] = time.split(':');
+  return `${hours.padStart(2, '0')}:${minutes || '00'}`;
 };
 
 export default function Schedule() {
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(dayjs());
   const [schedule, setSchedule] = useState([]);
+  const [weekSchedule, setWeekSchedule] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadSchedule();
-  }, [currentDate]);
+  const translateX = useSharedValue(0);
+
+  const processSchedule = (data) => {
+    if (!data || !Array.isArray(data)) {
+      setSchedule([]);
+      return;
+    }
+
+    const timeSlots = {};
+    data.forEach(lesson => {
+      const timeKey = `${lesson.time_start}-${lesson.time_end}`;
+
+      if (!timeSlots[timeKey]) {
+        timeSlots[timeKey] = {
+          id: timeKey,
+          timeStart: lesson.time_start,
+          timeEnd: lesson.time_end,
+          lessons: []
+        };
+      }
+
+      if (user.userType === 'student') {
+        if (lesson.subgroup === 0 || lesson.subgroup === user.subgroup || !user.subgroup) {
+          timeSlots[timeKey].lessons.push(lesson);
+        }
+      } else {
+        timeSlots[timeKey].lessons.push(lesson);
+      }
+    });
+
+    const formattedSchedule = Object.entries(timeSlots)
+      .sort(([timeA], [timeB]) => timeA.localeCompare(timeB))
+      .map(([_, slot]) => ({
+        ...slot,
+        lessons: slot.lessons.sort((a, b) => (a.subgroup ?? 0) - (b.subgroup ?? 0))
+      }))
+      .filter(slot => slot.lessons.length > 0);
+
+    setSchedule(formattedSchedule);
+  };
+
+  const loadWeekSchedule = async () => {
+    const startOfWeek = currentDate.startOf('week');
+    const dates = Array.from({ length: 7 }, (_, i) => startOfWeek.add(i, 'day'));
+
+    Promise.all(
+      dates.map(date =>
+        api.get('/schedule', {
+          params: { date: date.format('YYYY-MM-DD') }
+        })
+        .then(response => ({ date: date.format('YYYY-MM-DD'), data: response.data }))
+        .catch(() => ({ date: date.format('YYYY-MM-DD'), data: [] }))
+      )
+    ).then(results => {
+      const newWeekSchedule = {};
+      results.forEach(({ date, data }) => {
+        newWeekSchedule[date] = data;
+      });
+      setWeekSchedule(newWeekSchedule);
+      setIsLoading(false);
+    });
+  };
 
   const loadSchedule = async () => {
     try {
@@ -43,77 +112,54 @@ export default function Schedule() {
           date: currentDate.format('YYYY-MM-DD')
         }
       });
-
-      if (!response.data || !Array.isArray(response.data)) {
-        setSchedule([]);
-        return;
-      }
-
-      // Сортируем пары по времени
-      const sortedLessons = response.data.sort((a, b) => {
-        return a.time_start.localeCompare(b.time_start);
-      });
-
-      // Группируем пары по времени
-      const timeSlots = {};
-      sortedLessons.forEach(lesson => {
-        const timeKey = `${lesson.time_start}-${lesson.time_end}`;
-
-        // Проверяем подходит ли пара для текущего пользователя
-        const isValidForUser = user.userType === 'teacher' ?
-          (lesson.teacher_name === user.teacher_name || lesson.teacher_name === user.fullName) :
-          (lesson.group_name === user.group_name && (!lesson.subgroup || lesson.subgroup === 0 || lesson.subgroup === user.subgroup));
-
-        if (isValidForUser) {
-          if (!timeSlots[timeKey]) {
-            timeSlots[timeKey] = {
-              id: timeKey,
-              timeStart: lesson.time_start,
-              timeEnd: lesson.time_end,
-              lessons: []
-            };
-          }
-          timeSlots[timeKey].lessons.push(lesson);
-        }
-      });
-
-      // Преобразуем в массив и сортируем по времени
-      const formattedSchedule = Object.values(timeSlots)
-        .sort((a, b) => a.timeStart.localeCompare(b.timeStart));
-
-      // Если для преподавателя есть несколько групп в одно время,
-      // группируем их в одну пару
-      if (user.userType === 'teacher') {
-        formattedSchedule.forEach(slot => {
-          const groupedLessons = {};
-          slot.lessons.forEach(lesson => {
-            const key = `${lesson.subject}-${lesson.lesson_type}-${lesson.auditory}`;
-            if (!groupedLessons[key]) {
-              groupedLessons[key] = {
-                ...lesson,
-                groups: [lesson.group_name]
-              };
-            } else {
-              groupedLessons[key].groups.push(lesson.group_name);
-            }
-          });
-          slot.lessons = Object.values(groupedLessons);
-        });
-      }
-
-      setSchedule(formattedSchedule);
+      processSchedule(response.data);
     } catch (error) {
-      console.error('Failed to load schedule:', error);
+      setSchedule([]);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
   };
 
+  useEffect(() => {
+    loadWeekSchedule();
+  }, []);
+
+  useEffect(() => {
+    if (weekSchedule[currentDate.format('YYYY-MM-DD')]) {
+      processSchedule(weekSchedule[currentDate.format('YYYY-MM-DD')]);
+    } else {
+      loadSchedule();
+    }
+  }, [currentDate]);
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadSchedule();
+    await loadWeekSchedule();
+    setRefreshing(false);
   };
+
+  const goToNextDay = () => setCurrentDate(prev => prev.add(1, 'day'));
+  const goToPrevDay = () => setCurrentDate(prev => prev.subtract(1, 'day'));
+
+  const gesture = Gesture.Pan()
+    .onUpdate((e) => {
+      translateX.value = e.translationX;
+    })
+    .onEnd((e) => {
+      if (Math.abs(e.translationX) > SWIPE_THRESHOLD) {
+        if (e.translationX > 0) {
+          runOnJS(goToPrevDay)();
+        } else {
+          runOnJS(goToNextDay)();
+        }
+      }
+      translateX.value = withSpring(0);
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }]
+  }));
 
   const renderLesson = ({ item }) => (
     <View style={styles.lessonCard}>
@@ -133,9 +179,7 @@ export default function Schedule() {
                 {lesson.subgroup > 0 && ` • ${lesson.subgroup} подгруппа`}
               </Text>
               <Text style={styles.teacherText}>
-                {user.userType === 'student'
-                  ? lesson.teacher_name
-                  : (lesson.groups ? lesson.groups.join(', ') : lesson.group_name)}
+                {user.userType === 'student' ? lesson.teacher_name : lesson.group_name}
               </Text>
             </View>
           </View>
@@ -144,51 +188,54 @@ export default function Schedule() {
     </View>
   );
 
-  const goToPrevDay = () => setCurrentDate(prev => prev.subtract(1, 'day'));
-  const goToNextDay = () => setCurrentDate(prev => prev.add(1, 'day'));
-
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={goToPrevDay}>
-          <Ionicons name="chevron-back" size={24} color="#007AFF" />
-        </TouchableOpacity>
-        <Text style={styles.dateText}>
-          {currentDate.format('D MMMM')}
-        </Text>
-        <TouchableOpacity onPress={goToNextDay}>
-          <Ionicons name="chevron-forward" size={24} color="#007AFF" />
-        </TouchableOpacity>
-      </View>
-
-      {isLoading ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+    <GestureHandlerRootView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={goToPrevDay}>
+            <Ionicons name="chevron-back" size={24} color="#007AFF" />
+          </TouchableOpacity>
+          <Text style={styles.dateText}>
+            {currentDate.format('D MMMM')}
+          </Text>
+          <TouchableOpacity onPress={goToNextDay}>
+            <Ionicons name="chevron-forward" size={24} color="#007AFF" />
+          </TouchableOpacity>
         </View>
-      ) : (
-        <FlatList
-          data={schedule}
-          renderItem={renderLesson}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#007AFF"
-              colors={["#007AFF"]}
-              title="Обновление..."
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Нет пар на этот день</Text>
-            </View>
-          }
-        />
-      )}
-    </SafeAreaView>
+
+        <GestureDetector gesture={gesture}>
+          <Animated.View style={[styles.scheduleContainer, animatedStyle]}>
+            {isLoading ? (
+              <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color="#007AFF" />
+              </View>
+            ) : (
+              <FlatList
+                data={schedule}
+                renderItem={renderLesson}
+                keyExtractor={item => item.id}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor="#007AFF"
+                    colors={["#007AFF"]}
+                    title="Обновление..."
+                  />
+                }
+                ListEmptyComponent={
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>Нет пар на этот день</Text>
+                  </View>
+                }
+              />
+            )}
+          </Animated.View>
+        </GestureDetector>
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
@@ -196,6 +243,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F2F2F7',
+  },
+  scheduleContainer: {
+    flex: 1,
   },
   header: {
     paddingVertical: 16,
