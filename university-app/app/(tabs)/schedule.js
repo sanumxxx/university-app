@@ -45,13 +45,30 @@ export default function Schedule() {
   const translateX = useSharedValue(0);
 
   const processSchedule = (data) => {
-    if (!data || !Array.isArray(data)) {
-      setSchedule([]);
-      return;
-    }
+  console.log('Starting processSchedule function');
+  console.log('Raw data:', data);
+  console.log('Processing for user:', user);
 
-    const timeSlots = {};
-    data.forEach(lesson => {
+  if (!data || !Array.isArray(data)) {
+    setSchedule([]);
+    return;
+  }
+
+  const timeSlots = {};
+  data.forEach(lesson => {
+    console.log('Processing lesson:', lesson);
+
+    // Для преподавателя просто сравниваем teacher_name
+    const isTeacherLesson = user.userType === 'teacher' &&
+      lesson.teacher_name === user.teacher;  // Изменили здесь: используем user.teacher вместо full_name
+
+    const isStudentLesson = user.userType === 'student' &&
+      (lesson.subgroup === 0 || lesson.subgroup === user.subgroup || !user.subgroup);
+
+    console.log('Is teacher lesson:', isTeacherLesson);
+    console.log('Is student lesson:', isStudentLesson);
+
+    if (isTeacherLesson || isStudentLesson) {
       const timeKey = `${lesson.time_start}-${lesson.time_end}`;
 
       if (!timeSlots[timeKey]) {
@@ -63,25 +80,62 @@ export default function Schedule() {
         };
       }
 
-      if (user.userType === 'student') {
-        if (lesson.subgroup === 0 || lesson.subgroup === user.subgroup || !user.subgroup) {
-          timeSlots[timeKey].lessons.push(lesson);
+      if (user.userType === 'teacher') {
+        const existingLesson = timeSlots[timeKey].lessons.find(
+          existing =>
+            existing.subject === lesson.subject &&
+            existing.lesson_type === lesson.lesson_type &&
+            existing.auditory === lesson.auditory
+        );
+
+        if (existingLesson) {
+          if (!existingLesson.groups) {
+            existingLesson.groups = [existingLesson.group_name];
+          }
+          if (!existingLesson.groups.includes(lesson.group_name)) {
+            existingLesson.groups.push(lesson.group_name);
+          }
+        } else {
+          timeSlots[timeKey].lessons.push({
+            ...lesson,
+            groups: [lesson.group_name]
+          });
         }
       } else {
         timeSlots[timeKey].lessons.push(lesson);
       }
-    });
+    } else {
+      console.log('Skipping lesson - not matching user criteria');
+    }
+  });
 
-    const formattedSchedule = Object.entries(timeSlots)
-      .sort(([timeA], [timeB]) => timeA.localeCompare(timeB))
-      .map(([_, slot]) => ({
-        ...slot,
-        lessons: slot.lessons.sort((a, b) => (a.subgroup ?? 0) - (b.subgroup ?? 0))
-      }))
-      .filter(slot => slot.lessons.length > 0);
+  const formattedSchedule = Object.entries(timeSlots)
+    .sort(([timeA], [timeB]) => timeA.localeCompare(timeB))
+    .map(([_, slot]) => ({
+      ...slot,
+      lessons: slot.lessons.sort((a, b) => (a.subgroup ?? 0) - (b.subgroup ?? 0))
+    }))
+    .filter(slot => slot.lessons.length > 0);
 
-    setSchedule(formattedSchedule);
-  };
+  console.log('Final formatted schedule:', formattedSchedule);
+  setSchedule(formattedSchedule);
+};
+
+useEffect(() => {
+  console.log('Schedule component mounted');
+  loadWeekSchedule();
+}, []);
+
+useEffect(() => {
+  console.log('Current date changed:', currentDate.format('YYYY-MM-DD'));
+  if (weekSchedule[currentDate.format('YYYY-MM-DD')]) {
+    console.log('Using cached data for date');
+    processSchedule(weekSchedule[currentDate.format('YYYY-MM-DD')]);
+  } else {
+    console.log('Loading new data for date');
+    loadSchedule();
+  }
+}, [currentDate]);
 
   const loadWeekSchedule = async () => {
     const startOfWeek = currentDate.startOf('week');
@@ -106,20 +160,36 @@ export default function Schedule() {
   };
 
   const loadSchedule = async () => {
-    try {
-      const response = await api.get('/schedule', {
-        params: {
-          date: currentDate.format('YYYY-MM-DD')
-        }
-      });
-      processSchedule(response.data);
-    } catch (error) {
+  try {
+    console.log('Starting loadSchedule function');
+    console.log('Fetching data for date:', currentDate.format('YYYY-MM-DD'));
+    console.log('Current user:', user);
+
+    const response = await api.get('/schedule', {
+      params: {
+        date: currentDate.format('YYYY-MM-DD')
+      }
+    });
+
+    console.log('API Response:', response.data);
+
+    if (!response.data || !Array.isArray(response.data)) {
+      console.log('Invalid data received:', response.data);
       setSchedule([]);
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
+      return;
     }
-  };
+
+    processSchedule(response.data);
+  } catch (error) {
+    console.error('Error in loadSchedule:', error);
+    console.error('Error details:', error.response?.data);
+    console.error('Error status:', error.response?.status);
+    setSchedule([]);
+  } finally {
+    setIsLoading(false);
+    setRefreshing(false);
+  }
+};
 
   useEffect(() => {
     loadWeekSchedule();

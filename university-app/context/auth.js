@@ -1,33 +1,16 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter, useSegments } from 'expo-router';
+import { router } from 'expo-router';
 
 const AuthContext = createContext({});
 
 export function AuthProvider({ children }) {
-
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
-  const rootSegment = useSegments()[0];
-  const router = useRouter();
 
   useEffect(() => {
     loadUser();
   }, []);
-
-  useEffect(() => {
-    if (!isLoading) {
-      if (user && rootSegment === '(tabs)') {
-        // Уже на правильном экране
-        return;
-      }
-      if (user) {
-        router.replace('/(tabs)/schedule');
-      } else if (rootSegment !== '(tabs)') {
-        router.replace('/');
-      }
-    }
-  }, [user, isLoading]);
 
   const loadUser = async () => {
     try {
@@ -51,6 +34,7 @@ export function AuthProvider({ children }) {
       await AsyncStorage.setItem('token', token);
       await AsyncStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
+      router.replace('/(tabs)/schedule');
     } catch (error) {
       console.error('Login error:', error);
     }
@@ -60,6 +44,7 @@ export function AuthProvider({ children }) {
     try {
       await AsyncStorage.multiRemove(['token', 'user']);
       setUser(null);
+      router.replace('/');
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -72,9 +57,13 @@ export function AuthProvider({ children }) {
     logout
   };
 
+  if (isLoading) {
+    return null; // или компонент загрузки
+  }
+
   return (
     <AuthContext.Provider value={value}>
-      {!isLoading && children}
+      {children}
     </AuthContext.Provider>
   );
 }
